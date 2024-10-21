@@ -9,6 +9,7 @@ using namespace std;
 enum TokenType
 {
     T_INT,
+    T_FLOAT,
     T_ID,
     T_NUM,
     T_IF,
@@ -79,6 +80,10 @@ public:
                 string word = consumeWord();
                 if (word == "int")
                     tokens.push_back(Token{T_INT, word, line});
+                else if (word == "float")
+                {
+                    tokens.push_back(Token{T_FLOAT, word, line});
+                }
                 else if (word == "if")
                     tokens.push_back(Token{T_IF, word, line});
                 else if (word == "else")
@@ -188,6 +193,10 @@ private:
         {
             parseDeclaration();
         }
+        else if (tokens[pos].type == T_FLOAT)
+        {
+            parseDeclaration();
+        }
         else if (tokens[pos].type == T_ID)
         {
             parseAssignment();
@@ -222,9 +231,17 @@ private:
     }
     void parseDeclaration()
     {
-        expect(T_INT);
-        expect(T_ID);
-        expect(T_SEMICOLON);
+        if (tokens[pos].type == T_INT || tokens[pos].type == T_FLOAT)
+        {
+            pos++;               // Move past the type (int or float)
+            expect(T_ID);        // Expect an identifier
+            expect(T_SEMICOLON); // Expect a semicolon after the declaration
+        }
+        else
+        {
+            cout << "Syntax error: expected type declaration but found '" << tokens[pos].value << "' at line " << tokens[pos].line << endl;
+            exit(1);
+        }
     }
 
     void parseAssignment()
@@ -317,7 +334,7 @@ private:
 int main()
 {
     string input = R"(
-        int a;
+        float a;
         a = 5;
         int b;
         b = a + 10;
