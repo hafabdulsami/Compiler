@@ -20,12 +20,15 @@ enum TokenType
     T_MINUS,
     T_MUL,
     T_DIV,
+    T_WHILE,
+    T_FOR,
     T_LPAREN,
     T_RPAREN,
     T_LBRACE,
     T_RBRACE,
     T_SEMICOLON,
     T_GT,
+    T_LT, // Add this line for '<' operator
     T_EOF,
 };
 
@@ -103,6 +106,10 @@ public:
                     tokens.push_back(Token{T_ELSE, word, line});
                 else if (word == "return")
                     tokens.push_back(Token{T_RETURN, word, line});
+                else if (word == "while")
+                    tokens.push_back(Token{T_WHILE, word, line});
+                else if (word == "for")
+                    tokens.push_back(Token{T_FOR, word, line});
                 else
                     tokens.push_back(Token{T_ID, word, line});
                 continue;
@@ -142,6 +149,9 @@ public:
                 break;
             case '>':
                 tokens.push_back(Token{T_GT, ">", line});
+                break;
+            case '<':                                     // Add this case
+                tokens.push_back(Token{T_LT, "<", line}); // Assuming you want to handle '<'
                 break;
             default:
                 cout << "Unexpected character: " << current << " at line " << line << endl;
@@ -257,6 +267,14 @@ private:
         {
             parseReturnStatement();
         }
+        else if (tokens[pos].type == T_WHILE)
+        {
+            parseWhileStatement();
+        }
+        else if (tokens[pos].type == T_FOR)
+        {
+            parseForStatement();
+        }
         else if (tokens[pos].type == T_LBRACE)
         {
             parseBlock();
@@ -281,9 +299,17 @@ private:
     {
         if (tokens[pos].type == T_INT || tokens[pos].type == T_FLOAT)
         {
-            pos++;
-            expect(T_ID);
-            expect(T_SEMICOLON);
+            pos++;        // Consume the type token (int/float)
+            expect(T_ID); // Consume the identifier (e.g., i)
+
+            // Check if there's an assignment
+            if (tokens[pos].type == T_ASSIGN)
+            {
+                pos++;             // Consume the '=' token
+                parseExpression(); // Parse the expression (e.g., 10)
+            }
+
+            expect(T_SEMICOLON); // Ensure the statement ends with a semicolon
         }
         else
         {
@@ -298,6 +324,26 @@ private:
         expect(T_ASSIGN);
         parseExpression();
         expect(T_SEMICOLON);
+    }
+    void parseWhileStatement()
+    {
+        expect(T_WHILE);
+        expect(T_LPAREN);
+        parseExpression(); // Parse the condition
+        expect(T_RPAREN);
+        parseStatement(); // Parse the statement or block inside the while loop
+    }
+
+    void parseForStatement()
+    {
+        expect(T_FOR);
+        expect(T_LPAREN);
+        parseDeclaration(); // Initialization (e.g., int i = 0)
+        parseExpression();  // Condition (e.g., i < 10)
+        expect(T_SEMICOLON);
+        parseExpression(); // Increment (e.g., i = i + 1 or i++)
+        expect(T_RPAREN);
+        parseStatement(); // Parse the statement or block inside the for loop
     }
 
     void parseIfStatement()
@@ -323,13 +369,22 @@ private:
 
     void parseExpression()
     {
+        // Handle possible assignments
+        if (tokens[pos].type == T_ID && tokens[pos + 1].type == T_ASSIGN)
+        {
+            pos++;             // consume identifier
+            pos++;             // consume '='
+            parseExpression(); // parse the right-hand side of the assignment
+            return;            // exit after handling assignment expression
+        }
+
         parseTerm();
         while (tokens[pos].type == T_PLUS || tokens[pos].type == T_MINUS)
         {
             pos++;
             parseTerm();
         }
-        if (tokens[pos].type == T_GT)
+        if (tokens[pos].type == T_GT || tokens[pos].type == T_LT)
         {
             pos++;
             parseExpression();
@@ -373,27 +428,27 @@ private:
         }
         else
         {
-            cout << "Syntax error: expected token type " << type << " but found '" << tokens[pos].value << "' at line " << tokens[pos].line << endl;
+            cout << "Syntax error: expected token type " << type << " but found '" << tokens[pos].value + tokens[pos + 1].value + tokens[pos - 1].value << "' at line " << tokens[pos].line << endl;
             exit(1);
         }
     }
 };
-
 int main()
 {
     string sourceCode = R"(
-        int x;
-        x = 5 ;
-        // This is a single-line comment
-        float y;
-        y = 3 ;
-        /*
-            This is a multi-line comment
-        */
-        if (x > y) {
-            x = x + 1;
-        }
-    )";
+    int x = 5;
+    float y;
+    y = 3;
+    if (x > y) {
+        x = x + 1;
+    }
+    while (x > y) {
+        x = x - 1;
+    }
+    for (int i = 0; i < 10; i = i + 1) {
+        x = x + i;
+    }
+    )"; // Properly closed the raw string literal here
 
     Lexer lexer(sourceCode);
     vector<Token> tokens = lexer.tokenize();
