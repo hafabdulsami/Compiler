@@ -41,14 +41,15 @@ class Lexer
 private:
     string src;
     size_t pos;
-    int line; // Line number tracking
+    int line;
+    vector<string> comments; // Vector to store comments
 
 public:
     Lexer(const string &src)
     {
         this->src = src;
         this->pos = 0;
-        this->line = -1; // Initialize line number to 1
+        this->line = 1; // Initialize line number to 1
     }
 
     vector<Token> tokenize()
@@ -69,6 +70,20 @@ public:
                 continue;
             }
 
+            // Single-line comment
+            if (current == '/' && pos + 1 < src.size() && src[pos + 1] == '/')
+            {
+                comments.push_back(consumeSingleLineComment());
+                continue;
+            }
+
+            // Multi-line comment
+            if (current == '/' && pos + 1 < src.size() && src[pos + 1] == '*')
+            {
+                comments.push_back(consumeMultiLineComment());
+                continue;
+            }
+
             if (isdigit(current))
             {
                 tokens.push_back(Token{T_NUM, consumeNumber(), line});
@@ -81,9 +96,7 @@ public:
                 if (word == "int")
                     tokens.push_back(Token{T_INT, word, line});
                 else if (word == "float")
-                {
                     tokens.push_back(Token{T_FLOAT, word, line});
-                }
                 else if (word == "if")
                     tokens.push_back(Token{T_IF, word, line});
                 else if (word == "else")
@@ -140,13 +153,40 @@ public:
         return tokens;
     }
 
+    string consumeSingleLineComment()
+    {
+        size_t start = pos;
+        pos += 2; // Skip '//'
+        while (pos < src.size() && src[pos] != '\n')
+        {
+            pos++;
+        }
+        string comment = src.substr(start, pos - start);
+        return comment;
+    }
+
+    string consumeMultiLineComment()
+    {
+        size_t start = pos;
+        pos += 2; // Skip '/*'
+        while (pos + 1 < src.size() && !(src[pos] == '*' && src[pos + 1] == '/'))
+        {
+            if (src[pos] == '\n')
+                line++;
+            pos++;
+        }
+        pos += 2; // Skip '*/'
+        string comment = src.substr(start, pos - start);
+        return comment;
+    }
+
     string consumeNumber()
     {
         size_t start = pos;
         while (pos < src.size() && isdigit(src[pos]))
         {
             if (src[pos] == '\n')
-                line++; // Count newlines in numbers
+                line++;
             pos++;
         }
         return src.substr(start, pos - start);
@@ -158,10 +198,18 @@ public:
         while (pos < src.size() && isalnum(src[pos]))
         {
             if (src[pos] == '\n')
-                line++; // Count newlines in words
+                line++;
             pos++;
         }
         return src.substr(start, pos - start);
+    }
+
+    void printComments()
+    {
+        for (const auto &comment : comments)
+        {
+            cout << "Comment: " << comment << endl;
+        }
     }
 };
 
@@ -233,9 +281,9 @@ private:
     {
         if (tokens[pos].type == T_INT || tokens[pos].type == T_FLOAT)
         {
-            pos++;               // Move past the type (int or float)
-            expect(T_ID);        // Expect an identifier
-            expect(T_SEMICOLON); // Expect a semicolon after the declaration
+            pos++;
+            expect(T_ID);
+            expect(T_SEMICOLON);
         }
         else
         {
@@ -284,7 +332,7 @@ private:
         if (tokens[pos].type == T_GT)
         {
             pos++;
-            parseExpression(); // After relational operator, parse the next expression
+            parseExpression();
         }
     }
 
@@ -325,7 +373,7 @@ private:
         }
         else
         {
-            cout << "Syntax error: expected " << type << " but found '" << tokens[pos].value << "' at line " << tokens[pos].line << endl;
+            cout << "Syntax error: expected token type " << type << " but found '" << tokens[pos].value << "' at line " << tokens[pos].line << endl;
             exit(1);
         }
     }
@@ -333,20 +381,23 @@ private:
 
 int main()
 {
-    string input = R"(
-        float a;
-        a = 5;
-        int b;
-        b = a + 10;
-        if (b > 10) {
-            return b;
-        } else {
-            return 0;
+    string sourceCode = R"(
+        int x;
+        x = 5 ;
+        // This is a single-line comment
+        float y;
+        y = 3 ;
+        /*
+            This is a multi-line comment
+        */
+        if (x > y) {
+            x = x + 1;
         }
     )";
 
-    Lexer lexer(input);
+    Lexer lexer(sourceCode);
     vector<Token> tokens = lexer.tokenize();
+    lexer.printComments(); // Print skipped comments
 
     Parser parser(tokens);
     parser.parseProgram();
